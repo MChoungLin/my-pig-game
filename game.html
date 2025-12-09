@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小豬抵抗大野狼 - TV靜音版</title>
+    <style>
+        body { 
+            margin: 0; 
+            background-color: #333; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            width: 100vw;
+            overflow: hidden;
+            font-family: Arial, sans-serif; 
+        }
+        
+        canvas { 
+            background-color: #87CEEB; 
+            box-shadow: 0 0 30px rgba(0,0,0,0.5); 
+            height: 95vh; 
+            aspect-ratio: 4/3; 
+            border: 5px solid #fff;
+            border-radius: 10px;
+        }
+
+        #ui-layer { 
+            position: absolute; 
+            top: 30px; 
+            left: 50px; 
+            pointer-events: none; 
+        }
+        
+        .stat { 
+            font-size: 36px; 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 10px; 
+            text-shadow: 2px 2px 0px white; 
+        }
+        
+        /* --- 新增：靜音按鈕樣式 --- */
+        #mute-btn {
+            position: absolute;
+            top: 30px;
+            right: 50px; /* 放在右上角 */
+            width: 70px;
+            height: 70px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 4px solid #333;
+            border-radius: 50%;
+            font-size: 35px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 300; /* 確保在最上層 */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        #mute-btn:active {
+            transform: scale(0.9);
+            background-color: #eee;
+        }
+
+        /* 發射按鈕 */
+        #fire-btn {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 140px;
+            height: 140px;
+            background-color: #ff4444;
+            border-radius: 50%;
+            border: 6px solid white;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            color: white;
+            font-size: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none; 
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+            z-index: 100;
+        }
+        #fire-btn:active { transform: scale(0.9); background-color: #cc0000; }
+
+        /* 彈窗樣式 */
+        .overlay { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            background: rgba(255, 255, 255, 0.95); 
+            border: 8px solid #ff9800; 
+            color: #333; 
+            padding: 50px; 
+            text-align: center; 
+            border-radius: 30px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
+            min-width: 400px;
+            z-index: 200;
+        }
+        h1 { margin-top: 0; color: #ff6f00; font-size: 48px; margin-bottom: 30px; }
+        p { font-size: 24px; line-height: 1.5; }
+        button.menu-btn { 
+            padding: 20px 60px; 
+            font-size: 32px; 
+            cursor: pointer; 
+            background-color: #ff9800; 
+            border: none; 
+            color: white; 
+            border-radius: 60px; 
+            margin-top: 30px; 
+            border-bottom: 8px solid #e65100; 
+        }
+        button.menu-btn:active { transform: translateY(4px); border-bottom: 0px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div id="ui-layer">
+        <div class="stat" id="scoreDisplay">分數: 0</div>
+        <div class="stat" id="livesDisplay" style="color: red;">血量: ❤️❤️❤️❤️❤️</div>
+    </div>
+
+    <div id="mute-btn" onpointerdown="toggleMute()">🔊</div>
+
+    <div id="fire-btn" onpointerdown="playerShoot()">
+        發射!
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1>🐷 小豬氣球戰 🐺</h1>
+        <p>
+            按下遙控器 <strong style="color:red">確認鍵(OK)</strong> 發射！<br>
+            或者是點擊螢幕上的紅色按鈕
+        </p>
+        <button class="menu-btn" onclick="startGame()">▶ 開始遊戲</button>
+    </div>
+
+    <div id="game-over" class="overlay" style="display: none;">
+        <h1>遊戲結束</h1>
+        <p id="final-score" style="font-size: 36px;">最終分數: 0</p>
+        <button class="menu-btn" onclick="resetGame()">🔄 再玩一次</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+        const PIG_X = 60;
+
+        // --- 音效管理器 ---
+        const sounds = {
+            bgm: new Audio('sounds/bgm.mp3'),
+            shoot: new Audio('sounds/shoot.mp3'),
+            pop: new Audio('sounds/pop.mp3'),
+            fall: new Audio('sounds/fall.mp3'),
+            score: new Audio('sounds/score.mp3'),
+            hurt: new Audio('sounds/hurt.mp3')
+        };
+        sounds.bgm.loop = true;
+        sounds.bgm.volume = 0.3;
+
+        // --- 新增：靜音控制變數與函式 ---
+        let isMuted = false;
+
+        function toggleMute() {
+            isMuted = !isMuted; // 切換狀態
+            const btn = document.getElementById('mute-btn');
+            
+            if (isMuted) {
+                // 變成靜音
+                btn.innerText = '🔇';
+                sounds.bgm.pause(); // 立刻暫停音樂
+            } else {
+                // 解除靜音
+                btn.innerText = '🔊';
+                // 如果遊戲正在進行中，恢復音樂
+                if (isGameRunning) {
+                    sounds.bgm.play().catch(e => {});
+                }
+            }
+        }
+
+        function playSound(name) {
+            // 如果是靜音狀態，直接結束，不播放任何聲音
+            if (isMuted) return;
+
+            const sound = sounds[name];
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play().catch(e => {}); 
+            }
+        }
+
+        // 遊戲變數
+        let score = 0;
+        let lives = 5;
+        let isGameRunning = false;
+        let frameCount = 0;
+
+        // --- 類別定義 ---
+        
+        class Pig {
+            constructor() {
+                this.width = 40; this.height = 40;
+                this.x = PIG_X; this.y = HEIGHT / 2;
+                this.speed = 3; 
+                this.direction = 1;
+            }
+            update() {
+                this.y += this.speed * this.direction;
+                if (this.y <= 0) { this.y = 0; this.direction = 1; }
+                if (this.y + this.height >= HEIGHT) { this.y = HEIGHT - this.height; this.direction = -1; }
+            }
+            draw() {
+                ctx.fillStyle = '#FFC0CB'; ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = 'black'; ctx.fillRect(this.x + 25, this.y + 10, 5, 5);
+                ctx.fillStyle = '#ff69b4'; ctx.fillRect(this.x + 28, this.y + 20, 12, 10);
+            }
+        }
+
+        class Arrow {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.width = 20; this.height = 5;
+                this.speed = 8; this.markedForDeletion = false;
+            }
+            update() {
+                this.x += this.speed;
+                if (this.x > WIDTH) this.markedForDeletion = true;
+            }
+            draw() {
+                ctx.fillStyle = 'black'; ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.beginPath(); ctx.moveTo(this.x+this.width, this.y-2); ctx.lineTo(this.x+this.width+10, this.y+2.5); ctx.lineTo(this.x+this.width, this.y+7); ctx.fill();
+            }
+        }
+
+        class Wolf {
+            constructor() {
+                this.width = 40; this.height = 50;
+                const branchStart = 400;
+                this.x = Math.random() * (WIDTH - branchStart - 60) + branchStart;
+                this.y = 90;
+                this.speedY = Math.random() * 0.8 + 0.3; 
+                this.fallSpeed = 8; 
+                this.balloonRadius = 28; 
+                this.hasBalloon = true;
+                this.markedForDeletion = false;
+                this.fallSoundPlayed = false;
+            }
+            update() {
+                if (this.hasBalloon) {
+                    this.y += this.speedY;
+                } else {
+                    this.y += this.fallSpeed;
+                    if (!this.fallSoundPlayed) {
+                        playSound('fall');
+                        this.fallSoundPlayed = true;
+                    }
+                }
+                if (this.y + this.height >= HEIGHT) {
+                    this.y = HEIGHT - this.height;
+                    if (this.hasBalloon) {
+                        lives--; playSound('hurt'); updateUI(); this.markedForDeletion = true;
+                        if (lives <= 0) gameOver();
+                    } else {
+                        score += 100; playSound('score'); updateUI(); this.markedForDeletion = true;
+                    }
+                }
+            }
+            draw() {
+                if (this.hasBalloon) {
+                    ctx.fillStyle = 'red'; ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y - 15, this.balloonRadius, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(this.x + this.width/2 - 8, this.y - 23, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = 'white'; ctx.beginPath(); ctx.moveTo(this.x + this.width/2, this.y - 15 + this.balloonRadius); ctx.lineTo(this.x + this.width/2, this.y); ctx.stroke();
+                }
+                ctx.fillStyle = this.hasBalloon ? '#555' : '#333'; ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = 'yellow';
+                let eyeSize = this.hasBalloon ? 8 : 12; 
+                ctx.fillRect(this.x + 5, this.y + 10, eyeSize, eyeSize); ctx.fillRect(this.x + 25, this.y + 10, eyeSize, eyeSize);
+            }
+        }
+
+        // --- 遊戲控制 ---
+        let pig = new Pig();
+        let arrows = [];
+        let wolves = [];
+
+        function playerShoot() {
+            if (isGameRunning) {
+                arrows.push(new Arrow(pig.x + pig.width, pig.y + pig.height/2));
+                playSound('shoot');
+                
+                const btn = document.getElementById('fire-btn');
+                btn.style.transform = 'scale(0.9)';
+                setTimeout(() => btn.style.transform = 'scale(1)', 100);
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space' || e.key === 'Enter' || e.keyCode === 13) {
+                playerShoot();
+                e.preventDefault(); 
+            }
+        });
+
+        function checkCollisions() {
+            arrows.forEach(arrow => {
+                wolves.forEach(wolf => {
+                    if (wolf.hasBalloon && !arrow.markedForDeletion) {
+                        const bx = wolf.x + wolf.width/2;
+                        const by = wolf.y - 15;
+                        const ax = arrow.x + arrow.width;
+                        const ay = arrow.y + arrow.height/2;
+                        if (Math.sqrt((bx-ax)**2 + (by-ay)**2) < wolf.balloonRadius + 10) {
+                            wolf.hasBalloon = false; arrow.markedForDeletion = true; playSound('pop');
+                        }
+                    }
+                });
+            });
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = '#b0e0e6'; ctx.fillRect(0,0,WIDTH,HEIGHT);
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(PIG_X + 20, 0); ctx.lineTo(PIG_X + 20, HEIGHT); ctx.stroke();
+            ctx.fillStyle = '#8B4513'; ctx.fillRect(WIDTH - 100, 0, 100, HEIGHT);
+            ctx.fillRect(WIDTH/2, 60, WIDTH/2, 30);
+            ctx.fillStyle = '#32CD32'; ctx.beginPath(); ctx.arc(WIDTH - 100, 60, 40, 0, Math.PI*2); ctx.arc(WIDTH/2, 60, 30, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#4CAF50'; ctx.fillRect(0, HEIGHT-10, WIDTH, 10);
+        }
+
+        function updateUI() {
+            document.getElementById('scoreDisplay').innerText = `分數: ${score}`;
+            document.getElementById('livesDisplay').innerText = `血量: ${'❤️'.repeat(Math.max(0, lives))}`;
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('fire-btn').style.display = 'flex';
+            
+            sounds.bgm.currentTime = 0; 
+            // 只有在非靜音模式下才播放背景音樂
+            if (!isMuted) {
+                sounds.bgm.play().catch(e => {});
+            }
+            
+            resetGameLogic(); isGameRunning = true; gameLoop();
+        }
+
+        function gameOver() {
+            isGameRunning = false; sounds.bgm.pause();
+            document.getElementById('fire-btn').style.display = 'none';
+            document.getElementById('final-score').innerText = `最終分數: ${score}`;
+            document.getElementById('game-over').style.display = 'block';
+        }
+
+        function resetGame() { startGame(); }
+        function resetGameLogic() { score = 0; lives = 5; frameCount = 0; pig = new Pig(); arrows = []; wolves = []; updateUI(); }
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            drawBackground();
+            pig.update(); pig.draw();
+            frameCount++;
+            let spawnRate = 120;
+            if (score > 500) spawnRate = 100;
+            if (frameCount % spawnRate === 0) wolves.push(new Wolf());
+            arrows.forEach(arrow => { arrow.update(); arrow.draw(); });
+            arrows = arrows.filter(arrow => !arrow.markedForDeletion);
+            wolves.forEach(wolf => { wolf.update(); wolf.draw(); });
+            wolves = wolves.filter(wolf => !wolf.markedForDeletion);
+            checkCollisions();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        drawBackground();
+        updateUI();
+
+    </script>
+</body>
+</html>
