@@ -294,8 +294,53 @@
             }
             draw() {
                 ctx.fillStyle = 'black'; ctx.fillRect(this.x, this.y, this.width, this.height);
-                ctx.beginPath(); ctx.moveTo(this.x+this.width, this.y-2); ctx.lineTo(this.x+this.width+10, this.y+2.5); ctx.lineTo(this.x+this.width, this.y+7); ctx.fill
-his.x + 25, this.y + 10, eyeSize, eyeSize);
+                ctx.beginPath(); ctx.moveTo(this.x+this.width, this.y-2); ctx.lineTo(this.x+this.width+10, this.y+2.5); ctx.lineTo(this.x+this.width, this.y+7); ctx.fill();
+            }
+        }
+
+        class Wolf {
+            constructor() {
+                this.width = 40; this.height = 50;
+                const branchStart = 400;
+                this.x = Math.random() * (WIDTH - branchStart - 60) + branchStart;
+                this.y = 90;
+                this.speedY = Math.random() * 0.8 + 0.3; 
+                this.fallSpeed = 8; 
+                this.balloonRadius = 28; 
+                this.hasBalloon = true;
+                this.markedForDeletion = false;
+                this.fallSoundPlayed = false;
+            }
+            update() {
+                if (this.hasBalloon) {
+                    this.y += this.speedY;
+                } else {
+                    this.y += this.fallSpeed;
+                    if (!this.fallSoundPlayed) {
+                        playSound('fall');
+                        this.fallSoundPlayed = true;
+                    }
+                }
+                if (this.y + this.height >= HEIGHT) {
+                    this.y = HEIGHT - this.height;
+                    if (this.hasBalloon) {
+                        lives--; playSound('hurt'); updateUI(); this.markedForDeletion = true;
+                        if (lives <= 0) gameOver();
+                    } else {
+                        score += 100; playSound('score'); updateUI(); this.markedForDeletion = true;
+                    }
+                }
+            }
+            draw() {
+                if (this.hasBalloon) {
+                    ctx.fillStyle = 'red'; ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y - 15, this.balloonRadius, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(this.x + this.width/2 - 8, this.y - 23, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = 'white'; ctx.beginPath(); ctx.moveTo(this.x + this.width/2, this.y - 15 + this.balloonRadius); ctx.lineTo(this.x + this.width/2, this.y); ctx.stroke();
+                }
+                ctx.fillStyle = this.hasBalloon ? '#555' : '#333'; ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = 'yellow';
+                let eyeSize = this.hasBalloon ? 8 : 12; 
+                ctx.fillRect(this.x + 5, this.y + 10, eyeSize, eyeSize); ctx.fillRect(this.x + 25, this.y + 10, eyeSize, eyeSize);
             }
         }
 
@@ -304,7 +349,13 @@ his.x + 25, this.y + 10, eyeSize, eyeSize);
         let arrows = [];
         let wolves = [];
 
-        function playerShoot() {
+        // 修改為接收 event 參數
+        function playerShoot(e) {
+            if(e) {
+                e.preventDefault(); // 防止 iOS 雙擊縮放
+                e.stopPropagation();
+            }
+            
             if (isGameRunning) {
                 arrows.push(new Arrow(pig.x + pig.width, pig.y + pig.height/2));
                 playSound('shoot');
@@ -315,6 +366,7 @@ his.x + 25, this.y + 10, eyeSize, eyeSize);
             }
         }
 
+        // 鍵盤支援 (外接鍵盤時)
         window.addEventListener('keydown', e => {
             if (e.code === 'Space' || e.key === 'Enter' || e.keyCode === 13) {
                 playerShoot();
@@ -352,16 +404,21 @@ his.x + 25, this.y + 10, eyeSize, eyeSize);
             document.getElementById('livesDisplay').innerText = `血量: ${'❤️'.repeat(Math.max(0, lives))}`;
         }
 
-        function startGame() {
+        function startGame(e) {
+            if(e) e.preventDefault();
+            
+            // 重要：在用戶點擊開始按鈕的瞬間嘗試播放並恢復音樂
+            if (!isMuted) {
+                sounds.bgm.play().then(() => {
+                    // 播放成功
+                }).catch(err => {
+                    console.log("Audio play failed (waiting for interaction):", err);
+                });
+            }
+
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('game-over').style.display = 'none';
             document.getElementById('fire-btn').style.display = 'flex';
-            
-            sounds.bgm.currentTime = 0; 
-            // 只有在非靜音模式下才播放背景音樂
-            if (!isMuted) {
-                sounds.bgm.play().catch(e => {});
-            }
             
             resetGameLogic(); isGameRunning = true; gameLoop();
         }
@@ -373,7 +430,7 @@ his.x + 25, this.y + 10, eyeSize, eyeSize);
             document.getElementById('game-over').style.display = 'block';
         }
 
-        function resetGame() { startGame(); }
+        function resetGame(e) { startGame(e); }
         function resetGameLogic() { score = 0; lives = 5; frameCount = 0; pig = new Pig(); arrows = []; wolves = []; updateUI(); }
 
         function gameLoop() {
@@ -398,5 +455,4 @@ his.x + 25, this.y + 10, eyeSize, eyeSize);
 
     </script>
 </body>
-
 </html>
