@@ -2,122 +2,150 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小豬抵抗大野狼 - TV靜音版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>小豬抵抗大野狼 - iPad Mini 版</title>
     <style>
+        /* 禁止 iOS 預設的選取與觸控行為 */
+        * {
+            -webkit-touch-callout: none; /* 禁止長按選單 */
+            -webkit-user-select: none;   /* 禁止選取文字 */
+            user-select: none;
+            touch-action: none;          /* 禁止瀏覽器預設觸控行為(如滾動/縮放) */
+        }
+
         body { 
             margin: 0; 
             background-color: #333; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            height: 100vh; 
+            /* 使用 dvh (dynamic viewport height) 解決 Safari 網址列伸縮問題 */
+            height: 100dvh; 
             width: 100vw;
             overflow: hidden;
-            font-family: Arial, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
         }
         
         canvas { 
             background-color: #87CEEB; 
             box-shadow: 0 0 30px rgba(0,0,0,0.5); 
-            height: 95vh; 
+            /* 讓 Canvas 自動縮放以適應螢幕，但保持比例 */
+            max-width: 100%;
+            max-height: 100dvh;
             aspect-ratio: 4/3; 
             border: 5px solid #fff;
-            border-radius: 10px;
+            border-radius: 12px;
+            /* 確保渲染清晰 */
+            image-rendering: -webkit-optimize-contrast;
         }
 
         #ui-layer { 
             position: absolute; 
-            top: 30px; 
-            left: 50px; 
+            top: 20px; 
+            left: 20px; 
             pointer-events: none; 
+            z-index: 10;
         }
         
         .stat { 
-            font-size: 36px; 
+            font-size: 24px; /* iPad Mini 上稍微調整字體大小 */
             font-weight: bold; 
             color: #333; 
-            margin-bottom: 10px; 
+            margin-bottom: 5px; 
             text-shadow: 2px 2px 0px white; 
+            font-family: monospace;
         }
         
-        /* --- 新增：靜音按鈕樣式 --- */
+        /* --- 靜音按鈕 --- */
         #mute-btn {
             position: absolute;
-            top: 30px;
-            right: 50px; /* 放在右上角 */
-            width: 70px;
-            height: 70px;
-            background-color: rgba(255, 255, 255, 0.8);
-            border: 4px solid #333;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 3px solid #333;
             border-radius: 50%;
-            font-size: 35px;
+            font-size: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            z-index: 300; /* 確保在最上層 */
+            z-index: 300; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
+            /* 針對觸控優化 */
+            -webkit-tap-highlight-color: transparent;
         }
         #mute-btn:active {
             transform: scale(0.9);
             background-color: #eee;
         }
 
-        /* 發射按鈕 */
+        /* --- 發射按鈕 (針對平板右手拇指優化) --- */
         #fire-btn {
             position: absolute;
-            bottom: 40px;
-            right: 40px;
-            width: 140px;
-            height: 140px;
+            bottom: 30px;
+            right: 30px;
+            width: 120px; /* 稍微縮小一點以免遮擋太多畫面，但在iPad Mini上仍夠大 */
+            height: 120px;
             background-color: #ff4444;
             border-radius: 50%;
             border: 6px solid white;
             box-shadow: 0 5px 20px rgba(0,0,0,0.5);
             color: white;
-            font-size: 30px;
+            font-size: 28px;
             font-weight: bold;
             cursor: pointer;
             display: none; 
             align-items: center;
             justify-content: center;
-            transition: transform 0.1s;
             z-index: 100;
+            -webkit-tap-highlight-color: transparent;
+            /* 增加觸控感應區但不改變視覺大小 */
         }
-        #fire-btn:active { transform: scale(0.9); background-color: #cc0000; }
+        #fire-btn:active { 
+            transform: scale(0.9); 
+            background-color: #cc0000; 
+        }
 
-        /* 彈窗樣式 */
+        /* --- 彈窗樣式 --- */
         .overlay { 
             position: absolute; 
             top: 50%; 
             left: 50%; 
             transform: translate(-50%, -50%); 
-            background: rgba(255, 255, 255, 0.95); 
-            border: 8px solid #ff9800; 
+            background: rgba(255, 255, 255, 0.98); 
+            border: 6px solid #ff9800; 
             color: #333; 
-            padding: 50px; 
+            padding: 40px; 
             text-align: center; 
-            border-radius: 30px; 
+            border-radius: 20px; 
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
-            min-width: 400px;
+            width: 80%; /* 響應式寬度 */
+            max-width: 400px;
             z-index: 200;
         }
-        h1 { margin-top: 0; color: #ff6f00; font-size: 48px; margin-bottom: 30px; }
-        p { font-size: 24px; line-height: 1.5; }
+        h1 { margin-top: 0; color: #ff6f00; font-size: 36px; margin-bottom: 20px; }
+        p { font-size: 18px; line-height: 1.6; margin-bottom: 30px;}
+        
         button.menu-btn { 
-            padding: 20px 60px; 
-            font-size: 32px; 
+            padding: 15px 40px; 
+            font-size: 24px; 
             cursor: pointer; 
             background-color: #ff9800; 
             border: none; 
             color: white; 
-            border-radius: 60px; 
-            margin-top: 30px; 
-            border-bottom: 8px solid #e65100; 
+            border-radius: 50px; 
+            border-bottom: 6px solid #e65100; 
+            width: 100%;
+            -webkit-tap-highlight-color: transparent;
         }
-        button.menu-btn:active { transform: translateY(4px); border-bottom: 0px; }
+        button.menu-btn:active { 
+            transform: translateY(4px); 
+            border-bottom: 0px; 
+        }
     </style>
 </head>
 <body>
@@ -129,25 +157,25 @@
         <div class="stat" id="livesDisplay" style="color: red;">血量: ❤️❤️❤️❤️❤️</div>
     </div>
 
-    <div id="mute-btn" onpointerdown="toggleMute()">🔊</div>
+    <div id="mute-btn" onpointerdown="toggleMute(event)">🔊</div>
 
-    <div id="fire-btn" onpointerdown="playerShoot()">
+    <div id="fire-btn" onpointerdown="playerShoot(event)">
         發射!
     </div>
 
     <div id="start-screen" class="overlay">
         <h1>🐷 小豬氣球戰 🐺</h1>
         <p>
-            按下遙控器 <strong style="color:red">確認鍵(OK)</strong> 發射！<br>
-            或者是點擊螢幕上的紅色按鈕
+            點擊畫面上的 <strong style="color:red">紅色按鈕</strong> 來射擊！<br>
+            保護小豬不要被大野狼抓走
         </p>
-        <button class="menu-btn" onclick="startGame()">▶ 開始遊戲</button>
+        <button class="menu-btn" onpointerdown="startGame(event)">▶ 開始遊戲</button>
     </div>
 
     <div id="game-over" class="overlay" style="display: none;">
         <h1>遊戲結束</h1>
-        <p id="final-score" style="font-size: 36px;">最終分數: 0</p>
-        <button class="menu-btn" onclick="resetGame()">🔄 再玩一次</button>
+        <p id="final-score" style="font-size: 28px; font-weight: bold;">最終分數: 0</p>
+        <button class="menu-btn" onpointerdown="resetGame(event)">🔄 再玩一次</button>
     </div>
 
     <script>
@@ -158,6 +186,7 @@
         const PIG_X = 60;
 
         // --- 音效管理器 ---
+        // Safari 需要使用者互動後才能播放 AudioContext，這裡使用傳統 Audio 標籤較簡單，但仍受限
         const sounds = {
             bgm: new Audio('sounds/bgm.mp3'),
             shoot: new Audio('sounds/shoot.mp3'),
@@ -169,35 +198,61 @@
         sounds.bgm.loop = true;
         sounds.bgm.volume = 0.3;
 
-        // --- 新增：靜音控制變數與函式 ---
+        // 預先載入音效 (iOS Safari Trick)
+        function unlockAudio() {
+            Object.values(sounds).forEach(sound => {
+                sound.load();
+                // 嘗試播放一瞬間然後暫停，解鎖 iOS Audio 限制
+                const promise = sound.play();
+                if (promise !== undefined) {
+                    promise.then(_ => {
+                        sound.pause();
+                        sound.currentTime = 0;
+                    }).catch(error => {
+                        // Auto-play was prevented
+                    });
+                }
+            });
+            // 移除監聽器，只執行一次
+            document.removeEventListener('pointerdown', unlockAudio);
+            document.removeEventListener('touchstart', unlockAudio);
+        }
+        
+        // 第一次觸控時解鎖音效
+        document.addEventListener('pointerdown', unlockAudio, {once:true});
+
+        // --- 靜音控制 ---
         let isMuted = false;
 
-        function toggleMute() {
-            isMuted = !isMuted; // 切換狀態
+        function toggleMute(e) {
+            if(e) e.preventDefault(); // 防止觸控穿透
+            isMuted = !isMuted; 
             const btn = document.getElementById('mute-btn');
             
             if (isMuted) {
-                // 變成靜音
                 btn.innerText = '🔇';
-                sounds.bgm.pause(); // 立刻暫停音樂
+                sounds.bgm.pause();
             } else {
-                // 解除靜音
                 btn.innerText = '🔊';
-                // 如果遊戲正在進行中，恢復音樂
                 if (isGameRunning) {
-                    sounds.bgm.play().catch(e => {});
+                    sounds.bgm.play().catch(e => console.log('BGM play failed:', e));
                 }
             }
         }
 
         function playSound(name) {
-            // 如果是靜音狀態，直接結束，不播放任何聲音
             if (isMuted) return;
-
             const sound = sounds[name];
             if (sound) {
-                sound.currentTime = 0;
-                sound.play().catch(e => {}); 
+                // 複製節點以支援重疊播放 (例如連續射擊)
+                if (name === 'shoot' || name === 'pop') {
+                    const clone = sound.cloneNode();
+                    clone.volume = sound.volume;
+                    clone.play().catch(e => {});
+                } else {
+                    sound.currentTime = 0;
+                    sound.play().catch(e => {}); 
+                }
             }
         }
 
@@ -208,7 +263,6 @@
         let frameCount = 0;
 
         // --- 類別定義 ---
-        
         class Pig {
             constructor() {
                 this.width = 40; this.height = 40;
@@ -240,53 +294,8 @@
             }
             draw() {
                 ctx.fillStyle = 'black'; ctx.fillRect(this.x, this.y, this.width, this.height);
-                ctx.beginPath(); ctx.moveTo(this.x+this.width, this.y-2); ctx.lineTo(this.x+this.width+10, this.y+2.5); ctx.lineTo(this.x+this.width, this.y+7); ctx.fill();
-            }
-        }
-
-        class Wolf {
-            constructor() {
-                this.width = 40; this.height = 50;
-                const branchStart = 400;
-                this.x = Math.random() * (WIDTH - branchStart - 60) + branchStart;
-                this.y = 90;
-                this.speedY = Math.random() * 0.8 + 0.3; 
-                this.fallSpeed = 8; 
-                this.balloonRadius = 28; 
-                this.hasBalloon = true;
-                this.markedForDeletion = false;
-                this.fallSoundPlayed = false;
-            }
-            update() {
-                if (this.hasBalloon) {
-                    this.y += this.speedY;
-                } else {
-                    this.y += this.fallSpeed;
-                    if (!this.fallSoundPlayed) {
-                        playSound('fall');
-                        this.fallSoundPlayed = true;
-                    }
-                }
-                if (this.y + this.height >= HEIGHT) {
-                    this.y = HEIGHT - this.height;
-                    if (this.hasBalloon) {
-                        lives--; playSound('hurt'); updateUI(); this.markedForDeletion = true;
-                        if (lives <= 0) gameOver();
-                    } else {
-                        score += 100; playSound('score'); updateUI(); this.markedForDeletion = true;
-                    }
-                }
-            }
-            draw() {
-                if (this.hasBalloon) {
-                    ctx.fillStyle = 'red'; ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y - 15, this.balloonRadius, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(this.x + this.width/2 - 8, this.y - 23, 6, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = 'white'; ctx.beginPath(); ctx.moveTo(this.x + this.width/2, this.y - 15 + this.balloonRadius); ctx.lineTo(this.x + this.width/2, this.y); ctx.stroke();
-                }
-                ctx.fillStyle = this.hasBalloon ? '#555' : '#333'; ctx.fillRect(this.x, this.y, this.width, this.height);
-                ctx.fillStyle = 'yellow';
-                let eyeSize = this.hasBalloon ? 8 : 12; 
-                ctx.fillRect(this.x + 5, this.y + 10, eyeSize, eyeSize); ctx.fillRect(this.x + 25, this.y + 10, eyeSize, eyeSize);
+                ctx.beginPath(); ctx.moveTo(this.x+this.width, this.y-2); ctx.lineTo(this.x+this.width+10, this.y+2.5); ctx.lineTo(this.x+this.width, this.y+7); ctx.fill
+his.x + 25, this.y + 10, eyeSize, eyeSize);
             }
         }
 
@@ -389,4 +398,5 @@
 
     </script>
 </body>
+
 </html>
